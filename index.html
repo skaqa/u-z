@@ -65,36 +65,66 @@
         /* Container for multiple images */
         #images-wrapper {
             display: flex;
-            gap: 20px; /* Space between images */
+            gap: 15px; /* Reduced space between images */
             margin-bottom: 20px;
         }
 
         .image-container {
+            position: relative; /* Crucial for positioning the overlay */
             border: 5px solid #ccc;
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
 
-        /* Styling for individual images (reduced size for multiple) */
+        /* Styling for individual images (new default is for 3 images) */
         .flashcard-image {
-            width: 300px; /* Reduced width */
-            height: 300px; /* Reduced height */
-            object-fit: contain; /* Changed to contain for automatic resizing */
+            width: 250px; /* Base size for 3 images */
+            height: 250px; 
+            object-fit: contain; /* Keeps the entire image visible */
             display: block;
             opacity: 1;
             transition: opacity 0.3s ease-in-out;
         }
-        /* Adjusted width for single image view to keep it large */
+        
+        /* Size adjustment for ONE image view */
         .images-wrapper-1 .flashcard-image {
-            width: 400px;
+            width: 400px; /* Keep single image large */
             height: 400px;
         }
-        /* Adjusted width for two images */
+        
+        /* Size adjustment for TWO images view */
         .images-wrapper-2 .flashcard-image {
-            width: 350px;
-            height: 350px;
+            width: 320px; /* Adjusted width for 2 images */
+            height: 320px;
         }
+        
+        /* Overlay text styles (formerly #text-overlay) */
+        .image-overlay-text {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            font-family: 'Comic Sans MS', sans-serif;
+            font-size: 2.5em; /* Slightly smaller to fit in smaller images */
+            font-weight: bold;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.8);
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            pointer-events: none;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .show-text {
+            opacity: 1 !important;
+        }
+
 
         .image-loading {
             opacity: 0;
@@ -130,28 +160,6 @@
             cursor: wait !important;
             pointer-events: none;
         }
-       
-        #text-overlay {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 1000;
-            font-family: 'Comic Sans MS', sans-serif;
-            font-size: 3em;
-            font-weight: bold;
-            color: white;
-            background-color: rgba(0, 0, 0, 0.8);
-            padding: 20px 40px;
-            border-radius: 10px;
-            opacity: 0;
-            transition: opacity 0.3s ease-in-out;
-            pointer-events: none;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-        }
-        .show-text {
-            opacity: 1 !important;
-        }
     </style>
 </head>
 <body>
@@ -163,20 +171,19 @@
     </div>
 
     <div id="images-wrapper" class="images-wrapper-1">
-        <!-- Images will be dynamically inserted here -->
+        <!-- Images and Overlays will be dynamically inserted here -->
     </div>
 
     <div id="button-group">
         <button id="randomImageButton" class="action-button">Show Random Image</button>
         <button id="specialImageButton" class="action-button">Back To Ready</button>
     </div>
-    <div id="text-overlay">NEW IMAGE</div>
+    <!-- Removed the old single #text-overlay -->
    
     <script>
         const imagesWrapper = document.getElementById('images-wrapper');
         const randomButton = document.getElementById('randomImageButton');
         const specialButton = document.getElementById('specialImageButton');
-        const textOverlay = document.getElementById('text-overlay');
         const imageSlider = document.getElementById('image-slider');
         const imageSliderLabel = document.getElementById('image-slider-label');
 
@@ -187,7 +194,7 @@
 
         // Function to randomly select 'BIG' or 'LITTLE'
         function getRandomWord() {
-            const words = ["BIG", "LITTLE"];
+            const words = ["big", "little"];
             const randomIndex = Math.floor(Math.random() * words.length);
             return words[randomIndex];
         }
@@ -236,10 +243,17 @@
                 img.alt = `Currently displayed image ${i + 1}`;
                 img.decoding = 'async';
                 
+                // Overlay element
+                const overlay = document.createElement('div');
+                overlay.id = `overlay_${i}`;
+                overlay.className = 'image-overlay-text';
+                overlay.textContent = "WORD"; // Placeholder text
+
                 // Add an event listener to each image
                 img.addEventListener('load', handleImageLoad);
 
                 container.appendChild(img);
+                container.appendChild(overlay); // Append overlay to the container
                 imagesWrapper.appendChild(container);
             }
             imageSliderLabel.textContent = `Images to Show: ${count}`;
@@ -253,8 +267,7 @@
         imageSlider.addEventListener('input', function() {
             const count = parseInt(this.value);
             updateImageSlots(count);
-            // Ensure the special button text is correct after changing slots
-            specialButton.textContent = currentImageIndices.some(index => index !== 0) ? "Back To Ready" : "Ready";
+            specialButton.textContent = "Back To Ready";
         });
         
         // === Button Feedback ===
@@ -286,7 +299,7 @@
         }
         
         // === Core Image Change ===
-        function changeImage(imgElement, newPath, button) {
+        function changeImage(imgElement, newPath) {
             // Apply loading state to image
             imgElement.classList.add('image-loading');
             imgElement.src = newPath;
@@ -296,30 +309,35 @@
         randomButton.addEventListener('click', function() {
             if (randomButton.classList.contains('loading')) return;
 
-            // 1. Get a random word (BIG or LITTLE) and set the overlay text
-            const randomWord = getRandomWord();
-            textOverlay.textContent = randomWord; 
-
             setButtonLoading(randomButton, "Show Random Image", true);
-            textOverlay.classList.add('show-text');
+
+            const imageElements = imagesWrapper.querySelectorAll('.flashcard-image');
+            currentImageIndices = []; // Clear and refill the indices array
+
+            // Hide all overlays initially
+            imagesWrapper.querySelectorAll('.image-overlay-text').forEach(overlay => {
+                overlay.classList.remove('show-text');
+            });
 
             setTimeout(() => {
-                textOverlay.classList.remove('show-text');
-                // Note: The loading state removal is now handled in the handleImageLoad function 
-
-                const imageElements = imagesWrapper.querySelectorAll('.flashcard-image');
-                currentImageIndices = []; // Clear and refill the indices array
+                const overlays = imagesWrapper.querySelectorAll('.image-overlay-text');
 
                 imageElements.forEach((img, index) => {
+                    // 1. Get a random word (BIG or LITTLE) and set the overlay text
+                    const randomWord = getRandomWord();
+                    overlays[index].textContent = randomWord; 
+                    overlays[index].classList.add('show-text');
+
                     // Get next image from shuffle bag
                     const newIndex = getNextShuffledImage();
                     currentImageIndices.push(newIndex);
                     const newImagePath = `images/${newIndex}.png`;
 
-                    changeImage(img, newImagePath, randomButton);
+                    changeImage(img, newImagePath);
                 });
                 
                 specialButton.textContent = "Back To Ready";
+                // Note: The loading state removal for the button is handled in the handleImageLoad function 
             }, 1000);
         });
 
@@ -329,13 +347,18 @@
 
             setButtonLoading(specialButton, "Back To Ready", true);
 
+            // Hide all overlays instantly
+            imagesWrapper.querySelectorAll('.image-overlay-text').forEach(overlay => {
+                overlay.classList.remove('show-text');
+            });
+
             const imageElements = imagesWrapper.querySelectorAll('.flashcard-image');
             imageElements.forEach((img, index) => {
                 currentImageIndices[index] = 0; // Set index to 0
-                changeImage(img, SPECIAL_IMAGE_PATH, specialButton);
+                changeImage(img, SPECIAL_IMAGE_PATH);
             });
             
-            // Note: The loading state removal is now handled in the handleImageLoad function 
+            // Note: The loading state removal for the button is handled in the handleImageLoad function 
         });
 
         // Initial setup for buttons
