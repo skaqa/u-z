@@ -99,7 +99,7 @@
             height: 320px;
         }
         
-        /* Overlay text styles (formerly #text-overlay) */
+        /* Overlay text styles */
         .image-overlay-text {
             position: absolute;
             top: 0;
@@ -111,12 +111,14 @@
             justify-content: center;
             z-index: 1000;
             font-family: 'Comic Sans MS', sans-serif;
-            font-size: 2.5em; /* Slightly smaller to fit in smaller images */
+            font-size: 2.5em; 
             font-weight: bold;
             color: white;
             background-color: rgba(0, 0, 0, 0.8);
             opacity: 0;
-            transition: opacity 0.3s ease-in-out;
+            /* Note: We will handle the fade-out instantly or via JS, 
+               so the CSS transition time is not used for the delay */
+            transition: opacity 0.3s ease-in-out; 
             pointer-events: none;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
         }
@@ -178,7 +180,6 @@
         <button id="randomImageButton" class="action-button">Show Random Image</button>
         <button id="specialImageButton" class="action-button">Back To Ready</button>
     </div>
-    <!-- Removed the old single #text-overlay -->
    
     <script>
         const imagesWrapper = document.getElementById('images-wrapper');
@@ -312,21 +313,24 @@
             setButtonLoading(randomButton, "Show Random Image", true);
 
             const imageElements = imagesWrapper.querySelectorAll('.flashcard-image');
+            const overlays = imagesWrapper.querySelectorAll('.image-overlay-text');
+            const currentCount = parseInt(imageSlider.value);
+            const textDisplayDuration = currentCount * 1000; // 1s, 2s, or 3s
+
             currentImageIndices = []; // Clear and refill the indices array
 
-            // Hide all overlays initially
-            imagesWrapper.querySelectorAll('.image-overlay-text').forEach(overlay => {
+            // Hide all overlays initially (if any were showing)
+            overlays.forEach(overlay => {
                 overlay.classList.remove('show-text');
             });
 
+            // The main action happens after a short delay (e.g., 500ms for button feedback)
             setTimeout(() => {
-                const overlays = imagesWrapper.querySelectorAll('.image-overlay-text');
-
                 imageElements.forEach((img, index) => {
                     // 1. Get a random word (BIG or LITTLE) and set the overlay text
                     const randomWord = getRandomWord();
                     overlays[index].textContent = randomWord; 
-                    overlays[index].classList.add('show-text');
+                    overlays[index].classList.add('show-text'); // Show text
 
                     // Get next image from shuffle bag
                     const newIndex = getNextShuffledImage();
@@ -337,8 +341,16 @@
                 });
                 
                 specialButton.textContent = "Back To Ready";
+                
+                // 2. Set a second timeout to make the text disappear
+                setTimeout(() => {
+                    overlays.forEach(overlay => {
+                        overlay.classList.remove('show-text'); // Hide text
+                    });
+                }, textDisplayDuration);
+
                 // Note: The loading state removal for the button is handled in the handleImageLoad function 
-            }, 1000);
+            }, 500); // Small delay to allow the loading state to register
         });
 
         // === Special Button (Back to Ready) Logic ===
