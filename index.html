@@ -607,10 +607,14 @@
         let currentImageIndices = []; // Array to track indices of all displayed images
         let imagesLoaded = 0; // Counter for loaded images
 
+        // Set initial button content (optional, but good practice)
+        randomButton.innerHTML = RANDOM_BUTTON_CONTENT;
+        specialButton.innerHTML = SPECIAL_BUTTON_CONTENT;
+
+
         // Function to randomly select 'BIG' or 'LITTLE'
         function getRandomWord() {
-            // Converted to uppercase to match the visual style of the CSS
-            const words = ["big", "little"]; 
+            const words = ["BIG", "LITTLE"]; // Use uppercase to match new CSS
             const randomIndex = Math.floor(Math.random() * words.length);
             return words[randomIndex];
         }
@@ -711,7 +715,7 @@
             // The loading class is removed regardless of load success or failure
             img.classList.remove('image-loading'); 
 
-            // Check if all images have finished loading (by checking if the random button is still in a loading state)
+            // Check if all images have finished loading 
             const allImagesLoaded = Array.from(imagesWrapper.querySelectorAll('.flashcard-image')).every(
                 img => !img.classList.contains('image-loading')
             );
@@ -728,6 +732,8 @@
             // Apply loading state to image
             imgElement.classList.add('image-loading');
             imgElement.src = newPath;
+            // DEBUGGING AID: Log the path to console
+            console.log("Attempting to load image:", newPath); 
         }
 
         // === Random Button Logic ===
@@ -741,17 +747,28 @@
             const currentCount = parseInt(imageSlider.value);
             const textDisplayDuration = currentCount * 1000; // 1s, 2s, or 3s
 
-            currentImageIndices = []; // Clear and refill the indices array
+            // 1. Prepare/Pre-load (but don't display) the next set of images/indices
+            currentImageIndices = [];
+            imageElements.forEach(() => {
+                currentImageIndices.push(getNextShuffledImage());
+            });
 
             // Hide all overlays initially (if any were showing)
             overlays.forEach(overlay => {
                 overlay.classList.remove('show-text');
             });
 
-             // The main action happens after a short delay (Text APPEARS here)
+            // The main action happens after a short delay
             setTimeout(() => {
+                // --- STEP 2: TEXT APPEARS ---
+                overlays.forEach((overlay, index) => {
+                    // Set a new random word for each overlay
+                    const randomWord = getRandomWord();
+                    overlay.textContent = randomWord; 
+                    overlay.classList.add('show-text'); // Show text
+                });
                 
-                // ... (Logic to set BIG/LITTLE and show overlays) ...
+                specialButton.innerHTML = SPECIAL_BUTTON_CONTENT; // Ensure correct content is set
                 
                 // 2. Set a second timeout to make the text disappear AND load images
                 setTimeout(() => {
@@ -759,18 +776,17 @@
                     overlays.forEach(overlay => {
                         overlay.classList.remove('show-text'); // Hide text
                     });
-
+                    
                     // Load images immediately after text disappears
                     imageElements.forEach((img, index) => {
                         const newIndex = currentImageIndices[index]; // Use the index we stored
                         const newImagePath = `images/${newIndex}.png`;
                         changeImage(img, newImagePath);
                     });
-                    // Note: The loading state removal for the button is still handled in handleImageLoad
                     
                 }, textDisplayDuration);
                 
-            }, 300); // Small delay to allow the loading state to register
+            }, 300); // Small delay to allow the loading state to register (Text is ready to appear)
         });
 
         // === Special Button (Back to Ready) Logic ===
