@@ -47,22 +47,55 @@
             background-position: center;
             background-repeat: no-repeat;
         }
-        #image-container {
+        
+        /* Container for the slider and its label */
+        #controls-container {
             margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #image-slider-label {
+            margin-bottom: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+
+        /* Container for multiple images */
+        #images-wrapper {
+            display: flex;
+            gap: 20px; /* Space between images */
+            margin-bottom: 20px;
+        }
+
+        .image-container {
             border: 5px solid #ccc;
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
-        #myImage {
-        #myImage {
-            width: 400px;
-            height: 400px;
-            object-fit: cover; 
+
+        /* Styling for individual images (reduced size for multiple) */
+        .flashcard-image {
+            width: 300px; /* Reduced width */
+            height: 300px; /* Reduced height */
+            object-fit: contain; /* Changed to contain for automatic resizing */
             display: block;
             opacity: 1;
             transition: opacity 0.3s ease-in-out;
         }
+        /* Adjusted width for single image view to keep it large */
+        .images-wrapper-1 .flashcard-image {
+            width: 400px;
+            height: 400px;
+        }
+        /* Adjusted width for two images */
+        .images-wrapper-2 .flashcard-image {
+            width: 350px;
+            height: 350px;
+        }
+
         .image-loading {
             opacity: 0;
         }
@@ -123,9 +156,16 @@
 </head>
 <body>
     <h1>u-z Challenge</h1>
-    <div id="image-container">
-        <img id="myImage" src="images/0.png" alt="Currently displayed image" decoding="async">
+
+    <div id="controls-container">
+        <label for="image-slider" id="image-slider-label">Images to Show: 1</label>
+        <input type="range" id="image-slider" min="1" max="3" value="1">
     </div>
+
+    <div id="images-wrapper" class="images-wrapper-1">
+        <!-- Images will be dynamically inserted here -->
+    </div>
+
     <div id="button-group">
         <button id="randomImageButton" class="action-button">Show Random Image</button>
         <button id="specialImageButton" class="action-button">Back To Ready</button>
@@ -133,17 +173,21 @@
     <div id="text-overlay">NEW IMAGE</div>
    
     <script>
-        const imageElement = document.getElementById('myImage');
+        const imagesWrapper = document.getElementById('images-wrapper');
         const randomButton = document.getElementById('randomImageButton');
         const specialButton = document.getElementById('specialImageButton');
         const textOverlay = document.getElementById('text-overlay');
-        const TOTAL_IMAGES = 12; // UPDATED FOR 1-12 IMAGES
-        let currentImageIndex = 0;
+        const imageSlider = document.getElementById('image-slider');
+        const imageSliderLabel = document.getElementById('image-slider-label');
+
+        const TOTAL_IMAGES = 12;
         const SPECIAL_IMAGE_PATH = 'images/0.png';
+        
+        let currentImageIndices = []; // Array to track indices of all displayed images
 
         // Function to randomly select 'BIG' or 'LITTLE'
         function getRandomWord() {
-            const words = ["big", "little"];
+            const words = ["BIG", "LITTLE"];
             const randomIndex = Math.floor(Math.random() * words.length);
             return words[randomIndex];
         }
@@ -173,6 +217,46 @@
         // Initialize the bag on load
         refillAndShuffleBag();
 
+        // === Image UI Management ===
+
+        // Function to create and insert image elements
+        function updateImageSlots(count) {
+            imagesWrapper.innerHTML = ''; // Clear existing images
+            imagesWrapper.className = `images-wrapper-${count}`; // Update class for CSS resizing
+            currentImageIndices = Array(count).fill(0); // Reset tracking array
+
+            for (let i = 0; i < count; i++) {
+                const container = document.createElement('div');
+                container.className = 'image-container';
+
+                const img = document.createElement('img');
+                img.id = `myImage_${i}`;
+                img.className = 'flashcard-image';
+                img.src = SPECIAL_IMAGE_PATH; // Start with the ready image
+                img.alt = `Currently displayed image ${i + 1}`;
+                img.decoding = 'async';
+                
+                // Add an event listener to each image
+                img.addEventListener('load', handleImageLoad);
+
+                container.appendChild(img);
+                imagesWrapper.appendChild(container);
+            }
+            imageSliderLabel.textContent = `Images to Show: ${count}`;
+        }
+        
+        // Initial creation of 1 image slot
+        updateImageSlots(parseInt(imageSlider.value));
+
+
+        // === Slider Event Listener ===
+        imageSlider.addEventListener('input', function() {
+            const count = parseInt(this.value);
+            updateImageSlots(count);
+            // Ensure the special button text is correct after changing slots
+            specialButton.textContent = currentImageIndices.some(index => index !== 0) ? "Back To Ready" : "Ready";
+        });
+        
         // === Button Feedback ===
         function setButtonLoading(button, originalText, isLoading) {
             if (isLoading) {
@@ -185,25 +269,30 @@
         }
 
         // === Image Load Handler ===
-        imageElement.addEventListener('load', function() {
-            imageElement.classList.remove('image-loading');
-            if (randomButton.classList.contains('loading')) {
+        function handleImageLoad(event) {
+            const img = event.target;
+            img.classList.remove('image-loading');
+
+            // Check if all images have finished loading (by checking if the random button is still in a loading state)
+            const allImagesLoaded = Array.from(imagesWrapper.querySelectorAll('.flashcard-image')).every(
+                img => !img.classList.contains('image-loading')
+            );
+
+            if (allImagesLoaded && randomButton.classList.contains('loading')) {
                 setButtonLoading(randomButton, "Show Random Image", false);
-            } else if (specialButton.classList.contains('loading')) {
+            } else if (allImagesLoaded && specialButton.classList.contains('loading')) {
                 setButtonLoading(specialButton, "Back To Ready", false);
             }
-        });
-
+        }
+        
         // === Core Image Change ===
-        function changeImage(newPath, button) {
-            if (button.classList.contains('loading')) return;
-            const originalText = button.id === 'randomImageButton' ? "Show Random Image" : "Back To Ready";
-            setButtonLoading(button, originalText, true);
-            imageElement.classList.add('image-loading');
-            imageElement.src = newPath;
+        function changeImage(imgElement, newPath, button) {
+            // Apply loading state to image
+            imgElement.classList.add('image-loading');
+            imgElement.src = newPath;
         }
 
-        // === Random Button with Shuffle Bag ===
+        // === Random Button Logic ===
         randomButton.addEventListener('click', function() {
             if (randomButton.classList.contains('loading')) return;
 
@@ -211,34 +300,47 @@
             const randomWord = getRandomWord();
             textOverlay.textContent = randomWord; 
 
-            randomButton.classList.add('loading');
+            setButtonLoading(randomButton, "Show Random Image", true);
             textOverlay.classList.add('show-text');
 
             setTimeout(() => {
                 textOverlay.classList.remove('show-text');
-                randomButton.classList.remove('loading');
+                // Note: The loading state removal is now handled in the handleImageLoad function 
 
-                // Get next image from shuffle bag
-                const newIndex = getNextShuffledImage();
-                currentImageIndex = newIndex;
-                const newImagePath = `images/${currentImageIndex}.png`;
+                const imageElements = imagesWrapper.querySelectorAll('.flashcard-image');
+                currentImageIndices = []; // Clear and refill the indices array
 
+                imageElements.forEach((img, index) => {
+                    // Get next image from shuffle bag
+                    const newIndex = getNextShuffledImage();
+                    currentImageIndices.push(newIndex);
+                    const newImagePath = `images/${newIndex}.png`;
+
+                    changeImage(img, newImagePath, randomButton);
+                });
+                
                 specialButton.textContent = "Back To Ready";
-                changeImage(newImagePath, randomButton);
             }, 1000);
         });
 
-        // === Special Button (Back to Ready) ===
+        // === Special Button (Back to Ready) Logic ===
         specialButton.addEventListener('click', function() {
-            if (currentImageIndex === 0) return;
-            currentImageIndex = 0;
-            randomButton.textContent = "Show Random Image";
-            changeImage(SPECIAL_IMAGE_PATH, specialButton);
+            if (currentImageIndices.every(index => index === 0)) return; // Already at ready state
+
+            setButtonLoading(specialButton, "Back To Ready", true);
+
+            const imageElements = imagesWrapper.querySelectorAll('.flashcard-image');
+            imageElements.forEach((img, index) => {
+                currentImageIndices[index] = 0; // Set index to 0
+                changeImage(img, SPECIAL_IMAGE_PATH, specialButton);
+            });
+            
+            // Note: The loading state removal is now handled in the handleImageLoad function 
         });
 
-        // Initial setup
+        // Initial setup for buttons
         randomButton.textContent = "Show Random Image";
-        specialButton.textContent = "Back To Ready";
+        specialButton.textContent = "Back To Ready"; 
     </script>
 </body>
 </html>
